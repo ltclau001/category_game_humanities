@@ -1,1 +1,1 @@
-# category_game_-umanities
+# category_game_-humanities
