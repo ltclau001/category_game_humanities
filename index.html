@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>超級分類大挑戰：個人私隱與公開資訊安全</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Noto+Sans+TC:wght@500;700;900&display=swap');
+    
+    * {
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background: #EEF4FD;
+      touch-action: manipulation;
+    }
+
+    .title-font {
+      font-family: 'Noto Sans TC', 'Fredoka', sans-serif;
+    }
+
+    /* 搖晃動畫（放錯類別時） */
+    @keyframes wiggle {
+      0%, 100% { transform: translateX(0) rotate(0deg); }
+      20% { transform: translateX(-8px) rotate(-3deg); }
+      40% { transform: translateX(8px) rotate(3deg); }
+      60% { transform: translateX(-6px) rotate(-2deg); }
+      80% { transform: translateX(6px) rotate(2deg); }
+    }
+    .shake-anim {
+      animation: wiggle 0.45s ease-in-out;
+    }
+
+    /* 成功進入彈跳動畫 */
+    @keyframes popIn {
+      0% { transform: scale(0.6); opacity: 0; }
+      70% { transform: scale(1.08); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .pop-in {
+      animation: popIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+
+    /* 卡片選取高亮光暈 */
+    .card-selected {
+      transform: translateY(-6px) scale(1.03);
+      box-shadow: 0 0 0 4px #F59E0B, 0 12px 20px -3px rgba(245, 158, 11, 0.4) !important;
+    }
+
+    /* 目標放置籃呼吸提示 */
+    .drop-active {
+      box-shadow: 0 0 0 4px #3B82F6, 0 10px 25px -5px rgba(59, 130, 246, 0.35) !important;
+      transform: scale(1.01);
+    }
+
+    /* 捲軸美化 */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0,0,0,0.04);
+      border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(100,116,139,0.3);
+      border-radius: 999px;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col text-slate-800 antialiased p-2 sm:p-4 md:p-6 overflow-x-hidden">
+
+  <!-- 頂部資訊與控制欄 -->
+  <header class="max-w-7xl mx-auto w-full mb-3 sm:mb-4">
+    <!-- 主標題膠囊區 -->
+    <div class="flex flex-col items-center justify-center relative mb-3">
+      <div class="inline-flex items-center justify-center bg-[#FDE047] border-4 border-[#FACC15] px-8 sm:px-14 py-2.5 sm:py-3.5 rounded-full shadow-lg">
+        <h1 class="title-font text-2xl sm:text-3xl md:text-4xl font-black text-[#3730A3] tracking-wide flex items-center gap-2">
+          <span>🌟</span> 超級分類大挑戰 <span>🌟</span>
+        </h1>
+      </div>
+      <p class="text-xs sm:text-sm md:text-base font-bold text-slate-600 mt-2 text-center bg-white/70 px-4 py-1 rounded-full shadow-sm">
+        💡 玩法提示：把卡片<span class="text-blue-600 font-extrabold">拖放</span>至正確收集箱，或<span class="text-emerald-600 font-extrabold">點選卡片後點擊目標箱</span>進行分類！
+      </p>
+    </div>
+
+    <!-- 狀態列：計時、得分、進度、按鈕 -->
+    <div class="bg-white/95 backdrop-blur-md rounded-2xl shadow-sm border-2 border-slate-200/80 p-2.5 sm:p-3 flex flex-wrap items-center justify-between gap-2.5">
+      <!-- 統計數據 -->
+      <div class="flex items-center gap-2 sm:gap-4 flex-wrap">
+        <!-- 分數 -->
+        <div class="flex items-center gap-1.5 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl">
+          <span class="text-lg">⭐</span>
+          <span class="text-xs sm:text-sm font-bold text-amber-900">得分：</span>
+          <span id="scoreText" class="text-base sm:text-lg font-black text-amber-600 font-mono">0</span>
+        </div>
+
+        <!-- 連擊 Combo -->
+        <div id="comboBadge" class="hidden flex items-center gap-1 bg-rose-500 text-white text-xs sm:text-sm font-black px-2.5 py-1 rounded-xl shadow-sm animate-bounce">
+          🔥 連擊 x<span id="comboCount">0</span>
+        </div>
+
+        <!-- 完成進度 -->
+        <div class="flex items-center gap-2 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl min-w-[150px] sm:min-w-[190px]">
+          <span class="text-xs sm:text-sm font-bold text-blue-900">進度：</span>
+          <div class="flex-1 bg-blue-200 rounded-full h-3 overflow-hidden">
+            <div id="progressBar" class="bg-blue-600 h-full w-0 transition-all duration-300 rounded-full"></div>
+          </div>
+          <span id="progressText" class="text-xs sm:text-sm font-black text-blue-700 font-mono">0/15</span>
+        </div>
+
+        <!-- 時間 -->
+        <div class="flex items-center gap-1.5 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-xl">
+          <span class="text-sm">⏱️</span>
+          <span id="timeText" class="text-xs sm:text-sm font-bold font-mono text-slate-700">00:00</span>
+        </div>
+      </div>
+
+      <!-- 功能操作按鈕 -->
+      <div class="flex items-center gap-2 ml-auto">
+        <button id="soundBtn" class="flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-bold rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 border border-slate-300 transition">
+          <span id="soundIcon">🔊</span>
+          <span id="soundLabel" class="hidden sm:inline">音效開</span>
+        </button>
+        <button id="restartBtn" class="flex items-center gap-1 px-3 py-1.5 text-xs sm:text-sm font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white shadow transition">
+          <span>🔄</span> 重新挑戰
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 兩大分類收集箱（主戰場） -->
+  <main class="max-w-7xl mx-auto w-full flex-1 flex flex-col gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 md:gap-5 flex-1 min-h-[360px] md:min-h-[420px]">
+      
+      <!-- 收集區 1：可公開資訊 -->
+      <section id="zone-public" data-target="public"
+        class="bg-[#EBFBF2] border-4 border-[#86EFAC] rounded-3xl p-3 sm:p-4 flex flex-col shadow-md transition-all relative overflow-hidden group">
+        <!-- 類別標題徽章 -->
+        <div class="flex flex-col items-center mb-2 pointer-events-none">
+          <div class="bg-[#B9F5D0] border-2 border-[#4ADE80] text-[#14532D] px-6 sm:px-8 py-2 rounded-full font-black text-lg sm:text-xl md:text-2xl flex items-center gap-2.5 shadow-sm">
+            <!-- 泡泡對話 SVG -->
+            <svg class="w-7 h-7 text-[#059669]" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M4.5 3.75A3.75 3.75 0 00.75 7.5v6.75a3.75 3.75 0 003.75 3.75h1.5v3.188a.75.75 0 001.24.568l4.02-3.756h5.99a3.75 3.75 0 003.75-3.75V7.5a3.75 3.75 0 00-3.75-3.75H4.5z"/>
+            </svg>
+            可公開資訊
+          </div>
+          <span class="mt-1.5 text-xs sm:text-sm font-bold text-[#166534] bg-white/80 px-3 py-0.5 rounded-full shadow-xs">
+            這些資訊很安全，可以和新朋友分享喔！
+          </span>
+        </div>
+
+        <!-- 放入的已歸類卡片容器 -->
+        <div id="container-public" class="flex-1 bg-white/70 border-2 border-dashed border-emerald-300 rounded-2xl p-2.5 sm:p-3 grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-2.5 content-start overflow-y-auto max-h-[300px] md:max-h-[380px]">
+          <!-- 卡片動態填入 -->
+        </div>
+
+        <!-- 底部計數 -->
+        <div class="mt-2 text-right text-xs font-bold text-emerald-800">
+          已歸類：<span id="count-public" class="text-sm font-black text-emerald-600">0</span> / 6 項
+        </div>
+      </section>
+
+      <!-- 收集區 2：需保密私隱 -->
+      <section id="zone-private" data-target="private"
+        class="bg-[#FFF4ED] border-4 border-[#FDBA74] rounded-3xl p-3 sm:p-4 flex flex-col shadow-md transition-all relative overflow-hidden group">
+        <!-- 類別標題徽章 -->
+        <div class="flex flex-col items-center mb-2 pointer-events-none">
+          <div class="bg-[#FED7AA] border-2 border-[#FB923C] text-[#7C2D12] px-6 sm:px-8 py-2 rounded-full font-black text-lg sm:text-xl md:text-2xl flex items-center gap-2.5 shadow-sm">
+            <!-- 盾牌鎖頭 SVG -->
+            <svg class="w-7 h-7 text-[#EA580C]" viewBox="0 0 24 24" fill="currentColor">
+              <path fill-rule="evenodd" d="M12 1.5a.75.75 0 01.75.75V3.8c3.277.585 6 3.12 6 6.7v3.25l1.6 2.4a.75.75 0 01-.62 1.16H4.27a.75.75 0 01-.62-1.16l1.6-2.4V10.5c0-3.58 2.723-6.115 6-6.7V2.25A.75.75 0 0112 1.5zm-3 9.75a3 3 0 116 0v.75a.75.75 0 01-.75.75h-4.5a.75.75 0 01-.75-.75v-.75z" clip-rule="evenodd" />
+              <path d="M12 6a3.75 3.75 0 00-3.75 3.75v.75h7.5v-.75A3.75 3.75 0 0012 6z"/>
+            </svg>
+            需保密私隱
+          </div>
+          <span class="mt-1.5 text-xs sm:text-sm font-bold text-[#9A3412] bg-white/80 px-3 py-0.5 rounded-full shadow-xs">
+            個人私隱要好好保護，切勿隨意透露！
+          </span>
+        </div>
+
+        <!-- 放入的已歸類卡片容器 -->
+        <div id="container-private" class="flex-1 bg-white/70 border-2 border-dashed border-orange-300 rounded-2xl p-2.5 sm:p-3 grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-2.5 content-start overflow-y-auto max-h-[300px] md:max-h-[380px]">
+          <!-- 卡片動態填入 -->
+        </div>
+
+        <!-- 底部計數 -->
+        <div class="mt-2 text-right text-xs font-bold text-orange-900">
+          已歸類：<span id="count-private" class="text-sm font-black text-orange-600">0</span> / 9 項
+        </div>
+      </section>
+
+    </div>
+
+    <!-- 下方：待分類卡片庫 -->
+    <section class="bg-white rounded-3xl p-3 sm:p-4 border-2 border-slate-200 shadow-lg flex flex-col">
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="text-sm sm:text-base font-extrabold text-slate-700 flex items-center gap-1.5">
+          <span class="inline-block p-1 bg-amber-100 rounded-lg text-amber-700">🎴</span>
+          待分類卡片庫（點選或拖放卡片）：
+        </h2>
+        <span id="remainingBadge" class="text-xs font-black bg-indigo-100 text-indigo-700 px-2.5 py-0.5 rounded-full">
+          剩餘 15 張
+        </span>
+      </div>
+
+      <!-- 卡片列表（滾動/網格） -->
+      <div id="pendingPool" class="min-h-[145px] sm:min-h-[160px] p-2 bg-slate-50 border-2 border-dashed border-slate-300 rounded-2xl flex flex-wrap gap-2.5 sm:gap-3 items-center justify-center overflow-y-auto max-h-[220px]">
+        <!-- 待分類卡片動態渲染於此 -->
+      </div>
+    </section>
+  </main>
+
+  <!-- 浮動提示 Toast -->
+  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none transition-all duration-300 opacity-0 translate-y-4">
+    <div id="toastInner" class="bg-slate-900/90 text-white text-sm sm:text-base font-bold px-5 py-2.5 rounded-full shadow-2xl flex items-center gap-2">
+      <span id="toastIcon">💡</span>
+      <span id="toastText">提示訊息</span>
+    </div>
+  </div>
+
+  <!-- 遊戲過關結算彈窗 Modal -->
+  <div id="victoryModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 hidden opacity-0 transition-opacity duration-300">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-7 shadow-2xl border-4 border-amber-300 transform scale-95 transition-transform duration-300 flex flex-col items-center text-center max-h-[92vh] overflow-y-auto" id="modalCard">
+      <!-- 冠軍皇冠獎牌 -->
+      <div class="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center text-4xl mb-3 shadow-inner animate-bounce">
+        🏆
+      </div>
+
+      <h3 class="title-font text-2xl sm:text-3xl font-black text-slate-800">
+        太厲害了！挑戰成功！
+      </h3>
+      <p class="text-slate-500 font-bold text-sm mt-1 mb-3">你已成功守護個人私隱，成為安全網絡小達人！</p>
+
+      <!-- 三星評分 -->
+      <div class="flex items-center gap-2 text-3xl sm:text-4xl my-1 text-amber-400" id="starContainer">
+        <span>⭐</span><span>⭐</span><span>⭐</span>
+      </div>
+
+      <!-- 成績統計表格 -->
+      <div class="grid grid-cols-3 gap-2 w-full my-4 bg-slate-50 p-3 rounded-2xl border border-slate-200 text-center">
+        <div>
+          <div class="text-xs text-slate-400 font-bold">總用時</div>
+          <div id="modalTime" class="text-base sm:text-lg font-black text-slate-700 font-mono">00:00</div>
+        </div>
+        <div>
+          <div class="text-xs text-slate-400 font-bold">最終得分</div>
+          <div id="modalScore" class="text-base sm:text-lg font-black text-indigo-600 font-mono">0</div>
+        </div>
+        <div>
+          <div class="text-xs text-slate-400 font-bold">正確率</div>
+          <div id="modalAccuracy" class="text-base sm:text-lg font-black text-emerald-600 font-mono">100%</div>
+        </div>
+      </div>
+
+      <!-- 重點總結複習卡片 -->
+      <div class="w-full text-left bg-blue-50/70 border border-blue-200 rounded-2xl p-3 mb-4 text-xs sm:text-sm">
+        <div class="font-extrabold text-blue-900 mb-1 flex items-center gap-1">
+          <span>📝</span> 課堂安全秘訣回顧：
+        </div>
+        <p class="text-slate-600 mb-1">
+          • <strong class="text-emerald-700">可以公開：</strong>日常生活分享（如最喜愛的水果、天氣、卡通），既安全又能增進朋友情誼！
+        </p>
+        <p class="text-slate-600">
+          • <strong class="text-orange-700">務必保密：</strong>真實全名、住址、就讀學校、身份證、密碼及家人相片絕不向陌生人透露！
+        </p>
+      </div>
+
+      <!-- 再玩一次按鈕 -->
+      <button id="modalPlayAgainBtn" class="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 active:scale-98 text-white font-black text-lg rounded-2xl shadow-lg transition flex items-center justify-center gap-2">
+        <span>🔄</span> 再玩一次大挑戰
+      </button>
+    </div>
+  </div>
+
+  <!-- 彩花特效 Canvas -->
+  <canvas id="confettiCanvas" class="fixed inset-0 pointer-events-none z-50 hidden"></canvas>
+
+  <script>
+    /* =====================================================================
+       1. 資料庫定義（精準還原提供的教學圖片中 15 項內容與生動繪圖）
+       ===================================================================== */
+    const CARD_DATA = [
+      // ====== 可公開資訊（6項） ======
+      {
+        id: 'mood',
+        title: '今天的心情',
+        category: 'public',
+        tip: '今天心情好不好，可以和朋友一起分享傾談喔！',
+        svg: `<svg viewBox="0 0 100 100" class="w-full h-full">
+          <!-- 表情三連霸與滑動桿 -->
+          <circle cx="24" cy="40" r="14" fill="#F87171" stroke="#334155" stroke-width="2"/>
+          <path d="M19 46 Q24 40 29 46" stroke="#334155" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <circle cx="20" cy="36" r="1.8" fill="#334155"/><circle cx="28" cy="36" r="1.8" fill="#334155"/>
+
+          <circle cx="50" cy="40" r="14" fill="#FBBF24" stroke="#334155" stroke-width="2"/>
+          <line x1="45" y1="44" x2="55" y2="44" stroke="#334155" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="46" cy="36" r="1.8" fill="#334155"/><circle cx="54" cy="36" r="1.8" fill="#334155"/>
+
+          <circle cx="76" cy="40" r="14" fill="#34D399" stroke="#334155" stroke-width="2"/>
+          <path d="M71 42 Q76 49 81 42" stroke="#334155" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <circle cx="72" cy="36" r="1.8" fill="#334155"/><circle cx="80" cy="36" r="1.8" fill="#334155"/>
+
+          <!-- 下方量表滑軌 -->
+          <rect x="15" y="60" width="70" height="10" rx="3" fill="#E2E8F0" stroke="#334155" stroke-width="2"/>
+          <rect x="15" y="60" width="23" height="10" rx="2" fill="#F87171"/>
+          <rect x="38" y="60" width="24" height="10" fill="#FBBF24"/>
+          <rect x="62" y="60" width="23" height="10" rx="2" fill="#34D399"/>
+          <polygon points="50,73 45,82 55,82" fill="#10B981" stroke="#334155" stroke-width="1.5"/>
+        </svg>`
+      },
+      {
+        id: 'color',
+        title: '喜歡的顏色',
+        category: 'public',
+        tip: '每個人有喜愛的顏色，是日常安全的美術興趣話題！',
+        svg: `<svg viewBox="0 0 100 100" class="w-full h-full">
+          <!-- 調色盤 -->
+          <path d="M48 20 C25 20 16 35 18 58 C20 78 38 84 56 84 C66 84 75 79 78 70 C81 61 74 54 81 46 C87 38 82 20 48 20 Z" 
+                fill="#FDE68A" stroke="#78350F" stroke-width="2.5"/>
+          <circle cx="34" cy="35" r="5" fill="#EF4444"/>
+          <circle cx="48" cy="30" r="5" fill="#3B82F6"/>
+          <circle cx="63" cy="37" r="5" fill="#10B981"/>
+          <circle cx="30" cy="50" r="5" fill="#F59E0B"/>
+          <circle cx="38" cy="67" r="5" fill="#8B5CF6"/>
+          <!-- 畫筆 -->
+          <line x1="78" y1="20" x2="52" y2="58" stroke="#92400E" stroke-width="4.5" stroke-linecap="round"/>
+          <polygon points="52,58 46,65 55,64" fill="#3B82F6"/>
+          <rect x="65" y="32" width="7" height="4" transform="rotate(-55 65 32)" fill="#94A3B8"/>
+        </svg>`
+      },
+      {
+        id: 'fruit',
+        title: '愛吃的水果',
+        category: 'public',
+        tip: '水果營養又美味，隨時可以和好友同學一同交流！',
+        svg: `<svg viewBox="0 0 100 100" class="w-full h-full">
+          <!-- 西瓜片 -->
+          <path d="M28 62 C38 78 62 78 72 62 Z" fill="#EF4444" stroke="#15803D" stroke-width="3"/>
+          <circle cx="44" cy="65" r="1.5" fill="#1F2937"/>
+          <circle cx="50" cy="68" r="1.5" fill="#1F2937"/>
+          <circle cx="56" cy="65" r="1.5" fill="#1F2937"/>
+          <!-- 葡萄串 -->
+          <circle cx="30" cy="40" r="5" fill="#8B5CF6"/>
+          <circle cx="38" cy="38" r="5" fill="#7C3AED"/>
+          <circle cx="34" cy="47" r="5" fill="#6D28D9"/>
+          <!-- 蘋果 -->
+          <circle cx="62" cy="42" r="8" fill="#F87171"/>
+          <path d="M62 34 Q64 30 67 31" stroke="#78350F" stroke-width="2" fill="none"/>
+          <!-- 香蕉 -->
+          <path d="M68 50 Q78 58 74 72 Q64 68 62 55 Z" fill="#FDE047" stroke="#CA8A04" stroke-width="1.5"/>
+        </svg>`
+      },
+      {
+        id: 'cartoon',
+        title: '喜愛的卡通',
+        category: 'public',
+        tip: '卡通明星與動漫愛好很適合與同儕熱烈討論！',
+        svg: `<svg viewBox="0 0 100 100" class="w-full h-full">
+          <!-- 可愛黃色卡通獸 -->
+          <!-- 閃電尾巴 -->
+          <path d="M68 60 L78 48 L72 48 L82 35" stroke="#EAB308" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <!-- 身體 -->
+          <ellipse cx="50" cy="62" rx="19" ry="18" fill="#FACC15" stroke="#854D0E" stroke-width="2"/>
+          <!-- 耳朵 -->
+          <polygon points="36,42 24,18 42,32" fill="#FACC15" stroke="#854D0E" stroke-width="2"/>
+          <polygon points="24,18 29,24 33,21" fill="#1F2937"/>
+          <polygon points="64,42 76,18 58,32" fill="#FACC15" stroke="#854D0E" stroke-width="2"/>
+          <polygon points="76,18 71,24 67,21" fill="#1F2937"/>
+          <!-- 臉 -->
+          <circle cx="43" cy="53" r="3" fill="#1F2937"/>
+          <circle cx="57" cy="53" r="3" fill="#1F2937"/>
+          <circle cx="44" cy="52" r="1" fill="#FFF"/>
+          <circle cx="58" cy="52" r="1" fill="#FFF"/>
+          <!-- 紅臉頰 -->
+          <circle cx="36" cy="60" r="3.5" fill="#EF4444"/>
+          <circle cx="64" cy="60" r="3.5" fill="#EF4444"/>
+          <!-- 嘴 -->
+          <path d="M47 59 Q50 62 53 59" stroke="#854D0E" stroke-width="1.5" fill="none"/>
+        </svg>`
+      },
+      {
+        id: 'weather',
+        title: '今天的天氣',
+        category: 'public',
+        tip: '談論晴天或下雨是世界通用的問候禮儀！',
+        svg: `<svg viewBox="0 0 100 100" class="w-full h-full">
+          <!-- 太陽光芒 -->
+          <path d="M50 15 L50 24 M50 76 L50 85 M15 50 L24 50 M76 50 L85 50 M25 25 L32 32 M68 68 L75 75 M25 75 L32 68 M68 32 L75 25" 
+                stroke="#F59E0B" stroke-width="4.5" stroke-linecap="round"/>
+          <!-- 笑臉太陽本體 -->
+          <circle cx="50" cy="50" r="22" fill="#FDE047" stroke="#F59E0B" stroke-width="3"/>
+          <circle cx="42" cy="46" r="2.5" fill="#78350F"/>
+          <circle cx="58" cy="46" r="2.5" fill="#78350F"/>
+          <circle cx="36" cy="52" r="2" fill="#F87171"/>
+          <circle cx="64" cy="52" r="2" fill="#F87171"/>
+          <path d="M43 55 Q50 63 57 55" stroke="#78350F" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        </svg>`
+      },
+      {
+        id: 'book',
+        title: '喜歡的圖書',
+        category: 'public',
+        tip: '分享好讀物能結識有共同閱讀志趣的好朋友！',
+        svg: `<svg viewBox="0 0 100 100" class="w-full h-full">
+          <!-- 立體精裝圖書 -->
+          <path d="M28 32 L62 20 L76 68 L42 80 Z" fill="#3B82F6" stroke="#1E3A8A" stroke-width="2.5"/>
+          <path d="M36 33 L68 22 L71 27 L39 38 Z" fill="#60A5FA"/>
+          <!-- 書頁厚度 -->
+          <path d="M42 80 L76 68 L74 65 L40 77 Z" fill="#E2E8F0" stroke="#1E3A8A" stroke-width="1.5"/>
+          <line x1="44" y1="74" x2="73" y2="64" stroke="#94A3B8" stroke-width="1.2"/>
+          <line x1="43" y1="71" x2="72" y2="61" stroke="#94A3B8" stroke-width="1.2"/>
+          <!-- 封面裝飾 -->
+          <circle cx="54" cy="50" r="7" fill="#FDE047" stroke="#CA8A04" stroke-width="1.5"/>
+        </svg>`
+      },
+
+      // ====== 需保密私隱（9項） ======
+      {
+        id: 'name',
+        title: '姓名',
+        category: 'private',
+        tip: '真實全名容易在網絡上被拼湊身份，切忌任意公開！',
+        svg: `<svg viewBox="0 0 100 100" class="w-full h-full">
+          <!-- 學生姓名牌 -->
+          <rect x="18" y="32" width="64" height="36" rx="6" fill="#FEF3C7" stroke="#D97706" stroke-width="2.5"/>
+          <!-- 裝飾星星 -->
+          <polygon points="18,32 23,38 18,44 13,38" fill="#F59E0B"/>
+          <polygon points="82,68 87,74 82,80 77,74" fill="#F59E0B"/>
+          <!-- 文字標籤 -->
+          <text x="24" y="46" font-size="10" font-weight="bold" fill="#78350F" font-family="sans-serif">Name:</text>
+          <line x1="24" y1="58" x2="74" y2="58" stroke="#B45309" stroke-width="2" stroke-dasharray="3 2"/>
+        </svg>`
+      },
+      {
+        id: 'address',
+        title: '住宅地址',
+        category: 'private',
+        tip: '屋企地址透露居住位置，會危及全家安全，一定要保密！',
+        svg: `<svg viewBox="0 0 100 100" class="w-full h-full">
+          <!-- 溫馨小房子 -->
+          <polygon points="50,18 20,44 80,44" fill="#EF4444" stroke="#991B1B" stroke-width="2.5"/>
+          <rect x="27" y="44" width="46" height="38" fill="#FEF3C7" stroke="#991B1B" stroke-width="2.5"/>
+          <rect x="42" y="58" width="16" height="24" fill="#D97706"/>
+          <circle cx="53" cy="70" r="1.5" fill="#FEF3C7"/>
+          <rect x="58" y="49" width="10" height="10" rx="1" fill="#60A5FA" stroke="#1E40AF" stroke-width="1.5"/>
+          <circle cx="50" cy="35" r="3.5" fill="#FEF08A"/>
+        </svg>`
+      },
+      {
+        id: 'phone',
+        title: '電話號碼',
+        category: 'private',
+        tip: '公開電話號碼會引來陌生人騷擾電話或電話騙案！',
+        svg: `<svg viewBox="0 0 100 100" class="w-full h-full">
+          <!-- 綠色電話圓標 -->
+          <circle cx="50" cy="50" r="34" fill="#22C55E" stroke="#15803D" stroke-width="3"/>
+          <path d="M38 34 C36 34 33 37 33 40 C33 55 45 67 60 67 C63 67 66 64 66 62 L61 54 C60 52 57 52 56 53 L52 56 C47 52 44 49 42 44 L45 42 C46 41 47 38 45 37 L38 34 Z" fill="#FFFFFF"/>
+        </svg>`
+      },
+      {
+        id: 'birthday',
+        title: '生日日期',
+        category: 'private',
+        tip: '出生年月日是銀行與重要系統常用的身份驗證依據！',
+        svg: `<svg viewBox="0 0 100 100" class="w-full h-full">
+          <!-- 生日蛋糕 -->
+          <rect x="25" y="48" width="50" height="30" rx="8" fill="#FCE7F3" stroke="#DB2777" stroke-width="2.5"/>
+          <path d="M25 56 C29 60 33 56 37 56 C41 56 45 60 49 56 C53 56 57 60 61 56 C65 56 69 60 75 56 L75 48 L25 48 Z" fill="#F472B6"/>
+          <!-- 蠟燭 -->
+          <rect x="47" y="32" width="6" height="16" fill="#60A5FA"/>
+          <path d="M50 22 Q54 28 50 32 Q46 28 50 22 Z" fill="#F59E0B"/>
+          <!-- 蛋糕笑臉 -->
+          <circle cx="43" cy="66" r="2" fill="#831843"/>
+          <circle cx="57" cy="66" r="2" fill="#831843"/>
+          <path d="M47 70 Q50 73 53 70" stroke="#831843" stroke-width="1.5" fill="none"/>
+          <!-- 慶祝碎花 -->
+          <circle cx="20" cy="30" r="2" fill="#3B82F6"/>
+          <circle cx="80" cy="32" r="2" fill="#10B981"/>
+        </svg>`
+      },
+      {
+        id: 'school',
+        title: '學校名稱',
+        category: 'private',
+        tip: '透露學校名稱可能讓心懷不軌的人掌握你的日常行蹤！',
+        svg: `<svg viewBox="0 0 100 100" class="w-full h-full">
+          <!-- 學校建築 -->
+          <rect x="20" y="45" width="60" height="38" fill="#FEF08A" stroke="#854D0E" stroke-width="2"/>
+          <polygon points="50,22 14,45 86,45" fill="#EA580C" stroke="#9A3412" stroke-width="2"/>
+          <!-- 牌匾 -->
+          <rect x="34" y="32" width="32" height="10" rx="2" fill="#78350F"/>
+          <text x="37" y="40" font-size="7" font-weight="black" fill="#FFF" font-family="sans-serif">SCHOOL</text>
+          <!-- 大門與窗戶 -->
+          <path d="M44 65 Q50 58 56 65 L56 83 L44 83 Z" fill="#38BDF8" stroke="#0284C7" stroke-width="1.5"/>
+          <rect x="25" y="52" width="10" height="10" fill="#60A5FA"/>
+          <rect x="65" y="52" width="10" height="10" fill="#60A5FA"/>
+          <circle cx="50" cy="50" r="4" fill="#FFF" stroke="#64748B" stroke-width="1.5"/>
+        </svg>`
+      },
+      {
+        id: 'family_photo',
+        title: '個人及家人相片',
+        category: 'private',
+        tip: '個人與家人的容貌及生活環境照片容易被盜用或濫用！',
+        svg: `<svg viewBox="0 0 100 100" class="w-full h-full">
+          <!-- 相片相框 -->
+          <rect x="20" y="20" width="60" height="64" rx="4" fill="#FFFFFF" stroke="#94A3B8" stroke-width="2.5"/>
+          <rect x="24" y="24" width="52" height="46" fill="#F1F5F9"/>
+          <!-- 全家人物簡影 -->
+          <!-- 爸爸 -->
+          <circle cx="38" cy="38" r="6" fill="#93C5FD"/>
+          <path d="M30 52 C30 46 46 46 46 52 L46 62 L30 62 Z" fill="#3B82F6"/>
+          <!-- 媽媽 -->
+          <circle cx="62" cy="39" r="5.5" fill="#FCA5A5"/>
+          <path d="M54 53 C54 47 70 47 70 53 L70 62 L54 62 Z" fill="#EF4444"/>
+          <!-- 小孩 -->
+          <circle cx="50" cy="46" r="4.5" fill="#FDE047"/>
+          <path d="M43 56 C43 52 57 52 57 56 L57 65 L43 65 Z" fill="#10B981"/>
+          <!-- 頂部膠紙 -->
+          <rect x="42" y="16" width="16" height="8" fill="#FCD34D" opacity="0.8"/>
+        </svg>`
+      },
+      {
+        id: 'id_card',
+        title: '身份證號碼',
+        category: 'private',
+        tip: '身份證號碼是極重要的法定身份憑據，絕不可隨意出示！',
+        svg: `<svg viewBox="0 0 100 100" class="w-full h-full">
+          <!-- 晶片身份證 -->
+          <rect x="14" y="26" width="72" height="48" rx="6" fill="#E2E8F0" stroke="#475569" stroke-width="2"/>
+          <text x="38" y="37" font-size="7" font-weight="bold" fill="#334155" font-family="sans-serif">ID CARD</text>
+          <!-- 大頭貼 -->
+          <rect x="20" y="34" width="16" height="22" rx="2" fill="#CBD5E1"/>
+          <circle cx="28" cy="41" r="4" fill="#64748B"/>
+          <path d="M22 52 C22 47 34 47 34 52" fill="#475569"/>
+          <!-- 晶片 -->
+          <rect x="40" y="42" width="10" height="7" rx="1" fill="#F59E0B" stroke="#B45309" stroke-width="0.8"/>
+          <!-- 資料線條條碼 -->
+          <line x1="53" y1="44" x2="78" y2="44" stroke="#94A3B8" stroke-width="2"/>
+          <line x1="53" y1="48" x2="72" y2="48" stroke="#94A3B8" stroke-width="2"/>
+          <line x1="20" y1="62" x2="80" y2="62" stroke="#64748B" stroke-width="3" stroke-dasharray="6 3"/>
+        </svg>`
+      },
+      {
+        id: 'password',
+        title: '帳號密碼',
+        category: 'private',
+        tip: '帳號密碼是守護數碼資產的鑰匙，即使是好朋友也不能分享！',
+        svg: `<svg viewBox="0 0 100 100" class="w-full h-full">
+          <!-- 電腦螢幕 -->
+          <rect x="20" y="24" width="60" height="42" rx="4" fill="#334155" stroke="#1E293B" stroke-width="2"/>
+          <rect x="24" y="28" width="52" height="34" fill="#F8FAFC"/>
+          <!-- 螢幕底座 -->
+          <rect x="44" y="66" width="12" height="8" fill="#64748B"/>
+          <rect x="36" y="74" width="28" height="4" rx="2" fill="#475569"/>
+          <!-- 登入使用者圖標 -->
+          <circle cx="50" cy="38" r="4" fill="#3B82F6"/>
+          <!-- 密碼星號方塊 -->
+          <rect x="30" y="46" width="40" height="10" rx="3" fill="#E2E8F0" stroke="#94A3B8" stroke-width="1"/>
+          <text x="33" y="54" font-size="11" font-weight="black" fill="#1E293B" font-family="monospace">*****</text>
+        </svg>`
+      },
+      {
+        id: 'singing_video',
+        title: '自己唱歌的影片',
+        category: 'private',
+        tip: '包含個人樣貌、聲音甚至家居環境的短片，未經家長同意切勿上載！',
+        svg: `<svg viewBox="0 0 100 100" class="w-full h-full">
+          <!-- 影片播放器外框 -->
+          <rect x="16" y="22" width="68" height="56" rx="5" fill="#1E293B" stroke="#0F172A" stroke-width="2"/>
+          <rect x="19" y="25" width="62" height="42" fill="#E0F2FE"/>
+          <!-- 唱歌小朋友簡影 -->
+          <circle cx="50" cy="38" r="7" fill="#FCD34D"/>
+          <path d="M42 56 C42 48 58 48 58 56 Z" fill="#3B82F6"/>
+          <!-- 麥克風 -->
+          <rect x="42" y="44" width="3" height="7" fill="#64748B"/>
+          <circle cx="43.5" cy="43" r="3" fill="#10B981"/>
+          <!-- 飄揚音符 -->
+          <path d="M64 30 L64 36 M68 28 L68 34 M64 30 L68 28" stroke="#EC4899" stroke-width="1.8" stroke-linecap="round"/>
+          <!-- 播放進度條 -->
+          <rect x="20" y="70" width="60" height="4" rx="2" fill="#475569"/>
+          <rect x="20" y="70" width="24" height="4" rx="2" fill="#EF4444"/>
+          <polygon points="21,72 23,73 21,74" fill="#FFF"/>
+        </svg>`
+      }
+    ];
+
+    /* =====================================================================
+       2. Web Audio API 音效引擎（無外部依賴，純原生合成）
+       ===================================================================== */
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+      }
+
+      initContext() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) {
+            this.ctx = new AudioContext();
+          }
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      toggle() {
+        this.enabled = !this.enabled;
+        return this.enabled;
+      }
+
+      playSelect() {
+        if (!this.enabled) return;
+        this.initContext();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.08);
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.linearRampToValueAtTime(0, now + 0.08);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.08);
+      }
+
+      playCorrect() {
+        if (!this.enabled) return;
+        this.initContext();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        // 晶瑩愉悅的三連音 (C5 -> E5 -> G5)
+        const notes = [523.25, 659.25, 783.99];
+        notes.forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          const start = now + idx * 0.07;
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, start);
+          gain.gain.setValueAtTime(0.2, start);
+          gain.gain.exponentialRampToValueAtTime(0.001, start + 0.25);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(start);
+          osc.stop(start + 0.25);
+        });
+      }
+
+      playWrong() {
+        if (!this.enabled) return;
+        this.initContext();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        // 溫和提醒雙音 (F3 -> D3)
+        const notes = [174.61, 146.83];
+        notes.forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          const start = now + idx * 0.12;
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, start);
+          gain.gain.setValueAtTime(0.25, start);
+          gain.gain.linearRampToValueAtTime(0.01, start + 0.2);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(start);
+          osc.stop(start + 0.2);
+        });
+      }
+
+      playVictory() {
+        if (!this.enabled) return;
+        this.initContext();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        // 歡欣過關號角旋律 (C4 - E4 - G4 - C5 - E5 - G5)
+        const fanfare = [
+          { f: 261.63, d: 0.12 },
+          { f: 329.63, d: 0.12 },
+          { f: 392.00, d: 0.12 },
+          { f: 523.25, d: 0.25 },
+          { f: 659.25, d: 0.2 },
+          { f: 783.99, d: 0.5 }
+        ];
+        let cur = now;
+        fanfare.forEach((n) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(n.f, cur);
+          gain.gain.setValueAtTime(0.25, cur);
+          gain.gain.exponentialRampToValueAtTime(0.001, cur + n.d);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(cur);
+          osc.stop(cur + n.d);
+          cur += n.d * 0.9;
+        });
+      }
+    }
+
+    const sound = new SoundEngine();
+
+    /* =====================================================================
+       3. 遊戲核心狀態管理
+       ===================================================================== */
+    let pendingCards = [];
+    let placedPublic = [];
+    let placedPrivate = [];
+    let selectedCardId = null;
+    let score = 0;
+    let combo = 0;
+    let errorsCount = 0;
+    let timerSeconds = 0;
+    let timerInterval = null;
+    let isGameActive = false;
+
+    // DOM 元素引用
+    const pendingPool = document.getElementById('pendingPool');
+    const containerPublic = document.getElementById('container-public');
+    const containerPrivate = document.getElementById('container-private');
+    const zonePublic = document.getElementById('zone-public');
+    const zonePrivate = document.getElementById('zone-private');
+    const scoreText = document.getElementById('scoreText');
+    const comboBadge = document.getElementById('comboBadge');
+    const comboCount = document.getElementById('comboCount');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const timeText = document.getElementById('timeText');
+    const remainingBadge = document.getElementById('remainingBadge');
+    const countPublic = document.getElementById('count-public');
+    const countPrivate = document.getElementById('count-private');
+    const toast = document.getElementById('toast');
+    const toastText = document.getElementById('toastText');
+    const toastIcon = document.getElementById('toastIcon');
+    const victoryModal = document.getElementById('victoryModal');
+    const soundBtn = document.getElementById('soundBtn');
+    const soundIcon = document.getElementById('soundIcon');
+    const soundLabel = document.getElementById('soundLabel');
+    const restartBtn = document.getElementById('restartBtn');
+    const modalPlayAgainBtn = document.getElementById('modalPlayAgainBtn');
+
+    // 工具函式：洗牌（Fisher-Yates）
+    function shuffleArray(arr) {
+      const copy = [...arr];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    }
+
+    // 格式化秒數為 mm:ss
+    function formatTime(totalSec) {
+      const m = Math.floor(totalSec / 60).toString().padStart(2, '0');
+      const s = (totalSec % 60).toString().padStart(2, '0');
+      return `${m}:${s}`;
+    }
+
+    // 浮動提示框 Toast
+    let toastTimeout = null;
+    function showToast(message, icon = '💡') {
+      toastText.textContent = message;
+      toastIcon.textContent = icon;
+      toast.classList.remove('opacity-0', 'translate-y-4');
+      toast.classList.add('opacity-100', 'translate-y-0');
+
+      if (toastTimeout) clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-4');
+        toast.classList.remove('opacity-100', 'translate-y-0');
+      }, 2400);
+    }
+
+    // 初始化與重啟遊戲
+    function initGame() {
+      // 重設計時器
+      clearInterval(timerInterval);
+      timerSeconds = 0;
+      timeText.textContent = '00:00';
+      timerInterval = setInterval(() => {
+        if (isGameActive) {
+          timerSeconds++;
+          timeText.textContent = formatTime(timerSeconds);
+        }
+      }, 1000);
+
+      // 重設分數與連擊
+      score = 0;
+      combo = 0;
+      errorsCount = 0;
+      selectedCardId = null;
+      isGameActive = true;
+      scoreText.textContent = '0';
+      comboBadge.classList.add('hidden');
+
+      // 清空已分類容器
+      placedPublic = [];
+      placedPrivate = [];
+      containerPublic.innerHTML = '';
+      containerPrivate.innerHTML = '';
+      countPublic.textContent = '0';
+      countPrivate.textContent = '0';
+
+      // 關閉 Modal
+      victoryModal.classList.add('hidden', 'opacity-0');
+      document.getElementById('modalCard').classList.remove('scale-100');
+      document.getElementById('modalCard').classList.add('scale-95');
+      stopConfetti();
+
+      // 打亂卡片池
+      pendingCards = shuffleArray(CARD_DATA);
+      renderPendingPool();
+      updateProgress();
+    }
+
+    // 渲染待分類卡片池
+    function renderPendingPool() {
+      pendingPool.innerHTML = '';
+      remainingBadge.textContent = `剩餘 ${pendingCards.length} 張`;
+
+      if (pendingCards.length === 0) {
+        pendingPool.innerHTML = `
+          <div class="text-center py-4 text-emerald-600 font-extrabold flex items-center justify-center gap-2">
+            <span>🎉</span> 太棒了！所有卡片已全數分類完畢！
+          </div>`;
+        return;
+      }
+
+      pendingCards.forEach((card) => {
+        const cardEl = document.createElement('div');
+        cardEl.id = `card-${card.id}`;
+        cardEl.draggable = true;
+        cardEl.className = `
+          relative bg-white border-2 border-slate-300 hover:border-indigo-400 rounded-2xl p-2 sm:p-2.5 
+          w-[100px] sm:w-[115px] md:w-[125px] flex flex-col items-center justify-between cursor-pointer 
+          shadow-sm hover:shadow-md transition-all duration-200 transform active:scale-95
+          ${selectedCardId === card.id ? 'card-selected' : ''}
+        `;
+        cardEl.innerHTML = `
+          <div class="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 flex items-center justify-center pointer-events-none p-1">
+            ${card.svg}
+          </div>
+          <span class="mt-1 text-xs sm:text-sm font-black text-slate-800 text-center leading-tight pointer-events-none">
+            ${card.title}
+          </span>
+        `;
+
+        // 點選卡片事件（支援平板觸控）
+        cardEl.addEventListener('click', (e) => {
+          e.stopPropagation();
+          handleCardSelect(card.id);
+        });
+
+        // 拖曳事件（Drag & Drop）
+        cardEl.addEventListener('dragstart', (e) => {
+          selectedCardId = card.id;
+          e.dataTransfer.setData('text/plain', card.id);
+          cardEl.classList.add('opacity-50');
+          highlightDropZones(true);
+        });
+
+        cardEl.addEventListener('dragend', () => {
+          cardEl.classList.remove('opacity-50');
+          highlightDropZones(false);
+        });
+
+        // 觸控拖曳輔助
+        attachTouchEvents(cardEl, card.id);
+
+        pendingPool.appendChild(cardEl);
+      });
+    }
+
+    // 處理卡片點擊選取
+    function handleCardSelect(cardId) {
+      sound.playSelect();
+      if (selectedCardId === cardId) {
+        // 取消選取
+        selectedCardId = null;
+      } else {
+        selectedCardId = cardId;
+      }
+      // 更新選中視覺
+      const allCards = pendingPool.querySelectorAll('[id^="card-"]');
+      allCards.forEach(el => el.classList.remove('card-selected'));
+      if (selectedCardId) {
+        const target = document.getElementById(`card-${selectedCardId}`);
+        if (target) target.classList.add('card-selected');
+        showToast('請點擊上方「可公開資訊」或「需保密私隱」收集箱！', '👆');
+      }
+    }
+
+    // 目標區域放置高亮
+    function highlightDropZones(active) {
+      if (active) {
+        zonePublic.classList.add('drop-active');
+        zonePrivate.classList.add('drop-active');
+      } else {
+        zonePublic.classList.remove('drop-active');
+        zonePrivate.classList.remove('drop-active');
+      }
+    }
+
+    // 驗證並執行分類放置
+    function attemptCategorize(cardId, targetCategory) {
+      if (!cardId) return;
+      const card = CARD_DATA.find(c => c.id === cardId);
+      if (!card) return;
+
+      const isCorrect = card.category === targetCategory;
+
+      if (isCorrect) {
+        // 答對邏輯
+        sound.playCorrect();
+        combo++;
+        const comboBonus = (combo > 1) ? (combo * 15) : 0;
+        score += 100 + comboBonus;
+        scoreText.textContent = score;
+
+        if (combo >= 2) {
+          comboBadge.classList.remove('hidden');
+          comboCount.textContent = combo;
+        }
+
+        // 從待分類隊列移除
+        pendingCards = pendingCards.filter(c => c.id !== cardId);
+        selectedCardId = null;
+
+        // 加入已分類容器
+        if (targetCategory === 'public') {
+          placedPublic.push(card);
+          countPublic.textContent = placedPublic.length;
+          addCardToBucket(containerPublic, card, 'emerald');
+        } else {
+          placedPrivate.push(card);
+          countPrivate.textContent = placedPrivate.length;
+          addCardToBucket(containerPrivate, card, 'orange');
+        }
+
+        renderPendingPool();
+        updateProgress();
+        showToast(`答對了！「${card.title}」分類正確！`, '✨');
+
+        // 檢查是否完成通關
+        if (pendingCards.length === 0) {
+          handleVictory();
+        }
+
+      } else {
+        // 答錯邏輯
+        sound.playWrong();
+        combo = 0;
+        comboBadge.classList.add('hidden');
+        errorsCount++;
+
+        // 卡片搖晃回饋
+        const cardEl = document.getElementById(`card-${cardId}`);
+        if (cardEl) {
+          cardEl.classList.add('shake-anim');
+          setTimeout(() => {
+            cardEl.classList.remove('shake-anim');
+          }, 500);
+        }
+
+        // 溫馨提示教育資訊
+        showToast(`想一想：${card.tip}`, '🧐');
+      }
+    }
+
+    // 將已成功分類的卡片放入收集箱
+    function addCardToBucket(container, card, colorTheme) {
+      const item = document.createElement('div');
+      item.className = `
+        pop-in bg-white border border-${colorTheme}-200 rounded-xl p-1.5 sm:p-2 
+        flex flex-col items-center justify-center text-center shadow-xs
+      `;
+      item.innerHTML = `
+        <div class="w-8 h-8 sm:w-10 sm:h-10 p-0.5 pointer-events-none">
+          ${card.svg}
+        </div>
+        <span class="text-[11px] sm:text-xs font-black text-slate-700 truncate w-full mt-0.5">
+          ${card.title}
+        </span>
+      `;
+      container.appendChild(item);
+    }
+
+    // 更新進度條
+    function updateProgress() {
+      const completed = 15 - pendingCards.length;
+      const percent = Math.round((completed / 15) * 100);
+      progressBar.style.width = `${percent}%`;
+      progressText.textContent = `${completed}/15`;
+    }
+
+    // 設置兩個分類箱的事件監聽（點擊指派 + 拖放）
+    [zonePublic, zonePrivate].forEach((zone) => {
+      const targetCategory = zone.getAttribute('data-target');
+
+      // 點擊收集箱（若有選定卡片則直接分類）
+      zone.addEventListener('click', () => {
+        if (selectedCardId) {
+          attemptCategorize(selectedCardId, targetCategory);
+        }
+      });
+
+      // 拖放 Drag Over
+      zone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        zone.classList.add('drop-active');
+      });
+
+      zone.addEventListener('dragleave', () => {
+        zone.classList.remove('drop-active');
+      });
+
+      zone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        zone.classList.remove('drop-active');
+        const cardId = e.dataTransfer.getData('text/plain') || selectedCardId;
+        attemptCategorize(cardId, targetCategory);
+      });
+    });
+
+    // 觸控屏拖放支援（針對 iPad/觸控屏優化手勢）
+    function attachTouchEvents(el, cardId) {
+      let touchMoved = false;
+
+      el.addEventListener('touchstart', (e) => {
+        touchMoved = false;
+      }, { passive: true });
+
+      el.addEventListener('touchmove', () => {
+        touchMoved = true;
+      }, { passive: true });
+
+      el.addEventListener('touchend', (e) => {
+        // 若只是單純點擊，不做額外拖曳動作，由 click 事件負責
+      });
+    }
+
+    // 全局點擊空白處取消選中
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#pendingPool') && !e.target.closest('#zone-public') && !e.target.closest('#zone-private')) {
+        selectedCardId = null;
+        const allCards = pendingPool.querySelectorAll('[id^="card-"]');
+        allCards.forEach(c => c.classList.remove('card-selected'));
+      }
+    });
+
+    // 通關結算
+    function handleVictory() {
+      isGameActive = false;
+      clearInterval(timerInterval);
+      sound.playVictory();
+      startConfetti();
+
+      // 計算評分與星星
+      const starContainer = document.getElementById('starContainer');
+      let stars = 3;
+      if (errorsCount >= 4) stars = 1;
+      else if (errorsCount >= 2) stars = 2;
+
+      starContainer.innerHTML = '⭐'.repeat(stars) + '<span class="opacity-30">' + '⭐'.repeat(3 - stars) + '</span>';
+
+      const totalAttempts = 15 + errorsCount;
+      const accuracy = Math.round((15 / totalAttempts) * 100);
+
+      document.getElementById('modalTime').textContent = formatTime(timerSeconds);
+      document.getElementById('modalScore').textContent = score;
+      document.getElementById('modalAccuracy').textContent = `${accuracy}%`;
+
+      // 顯示 Modal
+      setTimeout(() => {
+        victoryModal.classList.remove('hidden');
+        setTimeout(() => {
+          victoryModal.classList.remove('opacity-0');
+          document.getElementById('modalCard').classList.remove('scale-95');
+          document.getElementById('modalCard').classList.add('scale-100');
+        }, 50);
+      }, 400);
+    }
+
+    /* =====================================================================
+       4. 彩花特效 (Pure HTML5 Canvas Confetti)
+       ===================================================================== */
+    const canvas = document.getElementById('confettiCanvas');
+    const ctx = canvas.getContext('2d');
+    let confettiParticles = [];
+    let confettiAnimationId = null;
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    class ConfettiPiece {
+      constructor() {
+        this.reset();
+      }
+      reset() {
+        this.x = Math.random() * canvas.width;
+        this.y = Math.random() * -canvas.height;
+        this.size = Math.random() * 9 + 6;
+        this.speedY = Math.random() * 4 + 2.5;
+        this.speedX = Math.random() * 3 - 1.5;
+        this.rotation = Math.random() * 360;
+        this.rotSpeed = Math.random() * 8 - 4;
+        const colors = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#FBBF24'];
+        this.color = colors[Math.floor(Math.random() * colors.length)];
+      }
+      update() {
+        this.y += this.speedY;
+        this.x += this.speedX;
+        this.rotation += this.rotSpeed;
+        if (this.y > canvas.height) {
+          this.reset();
+          this.y = -10;
+        }
+      }
+      draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate((this.rotation * Math.PI) / 180);
+        ctx.fillStyle = this.color;
+        ctx.fillRect(-this.size / 2, -this.size / 2, this.size, this.size * 0.7);
+        ctx.restore();
+      }
+    }
+
+    function startConfetti() {
+      resizeCanvas();
+      canvas.classList.remove('hidden');
+      confettiParticles = [];
+      for (let i = 0; i < 90; i++) {
+        confettiParticles.push(new ConfettiPiece());
+      }
+      function loop() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        confettiParticles.forEach(p => {
+          p.update();
+          p.draw();
+        });
+        confettiAnimationId = requestAnimationFrame(loop);
+      }
+      loop();
+    }
+
+    function stopConfetti() {
+      if (confettiAnimationId) {
+        cancelAnimationFrame(confettiAnimationId);
+      }
+      canvas.classList.add('hidden');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    /* =====================================================================
+       5. 控制與按鈕事件監聽
+       ===================================================================== */
+    // 音效開關切換
+    soundBtn.addEventListener('click', () => {
+      const active = sound.toggle();
+      soundIcon.textContent = active ? '🔊' : '🔇';
+      soundLabel.textContent = active ? '音效開' : '靜音中';
+      showToast(active ? '音效已開啟' : '音效已靜音', active ? '🔊' : '🔇');
+    });
+
+    // 重新開始
+    restartBtn.addEventListener('click', () => {
+      initGame();
+      showToast('遊戲已重新洗牌！加油！', '🔄');
+    });
+
+    // 通關彈窗的再玩一次
+    modalPlayAgainBtn.addEventListener('click', () => {
+      initGame();
+    });
+
+    // 首次啟動音訊與遊戲
+    window.addEventListener('load', () => {
+      initGame();
+      // 在首次觸控或點擊螢幕時喚醒 AudioContext（瀏覽器安全政策要求）
+      const unlockAudio = () => {
+        sound.initContext();
+        window.removeEventListener('click', unlockAudio);
+        window.removeEventListener('touchstart', unlockAudio);
+      };
+      window.addEventListener('click', unlockAudio);
+      window.addEventListener('touchstart', unlockAudio);
+    });
+  </script>
+</body>
+</html>
